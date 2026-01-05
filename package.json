@@ -1,0 +1,26 @@
+{
+  "name": "discord-whitelist-mm-bot",
+  "version": "1.0.0",
+  "description": "Discord bot with whitelist and middleman system",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy": "node src/deploy-command.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "whitelist",
+    "middleman"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.15.1",
+    "dotenv": "^16.4.5",
+    "git": "^0.1.5",
+    "mongoose": "^8.8.4"
+  }
+}
