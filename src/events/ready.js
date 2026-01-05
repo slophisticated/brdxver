@@ -1,26 +1,24 @@
-import { ActivityType } from "discord.js";
+import { ActivityType, Events } from "discord.js";
 
 export default {
-  name: "ready",
+  name: Events.ClientReady,
   once: true,
   execute(client) {
     console.log(`🚀 Bot is online as ${client.user.tag}`);
 
-    // Update pertama saat bot nyala
     const guild = client.guilds.cache.get("ID_SERVER_KAMU");
-    if (guild) {
-      client.user.setPresence({
-        activities: [
-          {
-            name: `${guild.memberCount} Members`,
-            type: ActivityType.Watching,
-          },
-        ],
-        status: "online",
-      });
-    }
+    if (!guild) return;
 
-    // Update berkala tiap 10 menit
+    client.user.setPresence({
+      activities: [
+        {
+          name: `${guild.memberCount} Members`,
+          type: ActivityType.Watching,
+        },
+      ],
+      status: "online",
+    });
+
     setInterval(() => {
       const guild = client.guilds.cache.get("1422567690362683507");
       if (!guild) return;
