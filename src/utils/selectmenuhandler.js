@@ -229,11 +229,6 @@ export async function handleModalSubmit(interaction) {
 
     const controlButtons = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`mm_complete_${transactionId}`)
-        .setLabel("✔️ Complete Transaction")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("✅"),
-      new ButtonBuilder()
         .setCustomId(`mm_close_${transactionId}`)
         .setLabel("❌ Close Ticket")
         .setStyle(ButtonStyle.Danger)
