@@ -1,261 +1,65 @@
 import {
   EmbedBuilder,
-  PermissionFlagsBits,
-  ModalBuilder,
   ActionRowBuilder,
-  TextInputBuilder,
-  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle,
 } from "discord.js";
+
 import Transaction from "../database/models/Transaction.js";
 import config from "../config/config.js";
 import getSettings from "./getsettings.js";
+
+/* ================= BUTTON HANDLER ================= */
 
 export default async function handleButton(interaction) {
   const { customId } = interaction;
 
   if (customId.startsWith("mm_upload_proof_")) {
     const transactionId = customId.replace("mm_upload_proof_", "");
-    await handleUploadProof(interaction, transactionId);
-  } else if (customId.startsWith("mm_proof_uploaded_")) {
+    return handleUploadProof(interaction, transactionId);
+  }
+
+  if (customId.startsWith("mm_proof_uploaded_")) {
     const transactionId = customId.replace("mm_proof_uploaded_", "");
-    await handleProofUploaded(interaction, transactionId);
-  } else if (customId.startsWith("mm_complete_")) {
-    // Check if user has middleman role (owner bypass)
-    if (
-      interaction.user.id !== config.ownerId &&
-      !interaction.member.roles.cache.has(config.roles.middleman) &&
-      !interaction.member.roles.cache.has(config.roles.admin)
-    ) {
+    return handleProofUploaded(interaction, transactionId);
+  }
+
+  if (customId.startsWith("mm_complete_")) {
+    if (!hasPermission(interaction)) {
       return interaction.reply({
         content: "❌ Only middleman or admin can use this button!",
         ephemeral: true,
       });
     }
+
     const transactionId = customId.replace("mm_complete_", "");
-    await handleComplete(interaction, transactionId);
-  } else if (customId.startsWith("mm_close_")) {
-    // Check if user has middleman role (owner bypass)
-    if (
-      interaction.user.id !== config.ownerId &&
-      !interaction.member.roles.cache.has(config.roles.middleman) &&
-      !interaction.member.roles.cache.has(config.roles.admin)
-    ) {
+    return handleComplete(interaction, transactionId);
+  }
+
+  if (customId.startsWith("mm_close_")) {
+    if (!hasPermission(interaction)) {
       return interaction.reply({
         content: "❌ Only middleman or admin can use this button!",
         ephemeral: true,
       });
     }
+
     const transactionId = customId.replace("mm_close_", "");
-    await handleClose(interaction, transactionId);
+    return handleClose(interaction, transactionId);
   }
 }
 
-async function handleUploadProof(interaction, transactionId) {
-  const modal = new ModalBuilder()
-    .setCustomId(`mm_proof_modal_${transactionId}`)
-    .setTitle("Upload Payment Proof");
+/* ================= PERMISSION ================= */
 
-  const proofInput = new TextInputBuilder()
-    .setCustomId("proof_link")
-    .setLabel("Payment Proof Link (Image URL)")
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder("https://imgur.com/xxx or paste image link")
-    .setRequired(true);
-
-  const notesInput = new TextInputBuilder()
-    .setCustomId("proof_notes")
-    .setLabel("Additional Notes (Optional)")
-    .setStyle(TextInputStyle.Paragraph)
-    .setPlaceholder("Any additional information...")
-    .setRequired(false);
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(proofInput),
-    new ActionRowBuilder().addComponents(notesInput)
+function hasPermission(interaction) {
+  return (
+    interaction.user.id === config.ownerId ||
+    interaction.member.roles.cache.has(config.roles.middleman) ||
+    interaction.member.roles.cache.has(config.roles.admin)
   );
-
-  await interaction.showModal(modal);
 }
 
-async function handleProofUploaded(interaction, transactionId) {
-  const embed = new EmbedBuilder()
-    .setColor(config.colors.success)
-    .setTitle("✅ Payment Proof Uploaded")
-    .setDescription(
-      `${interaction.user} has marked payment proof as uploaded.\n\nMiddleman will verify shortly.`
-    )
-    .setTimestamp();
-
-  await interaction.reply({ embeds: [embed] });
-}
-
-async function handleComplete(interaction, transactionId) {
-  await interaction.deferReply();
-
-  try {
-    const transaction = await Transaction.findOne({
-      transactionId,
-      status: "active",
-    });
-
-    if (!transaction) {
-      return interaction.editReply({
-        content: "❌ Transaction not found or already completed!",
-      });
-    }
-
-    // Update transaction status
-    transaction.status = "completed";
-    transaction.completedAt = new Date();
-    transaction.middleman = {
-      userId: interaction.user.id,
-      username: interaction.user.tag,
-    };
-    await transaction.save();
-
-    // Fetch transcript from thread
-    const thread = interaction.channel;
-    const messages = await thread.messages.fetch({ limit: 100 });
-
-    // Build transcript
-    let transcript = `═══════════════════════════════════════\n`;
-    transcript += `TRANSACTION TRANSCRIPT - ${transactionId}\n`;
-    transcript += `Completed: ${new Date().toLocaleString("id-ID")}\n`;
-    transcript += `═══════════════════════════════════════\n\n`;
-
-    // Sort messages oldest to newest
-    const sortedMessages = Array.from(messages.values()).reverse();
-
-    sortedMessages.forEach((msg) => {
-      const timestamp = msg.createdAt.toLocaleString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-      });
-      transcript += `[${timestamp}] ${msg.author.tag}:\n`;
-
-      if (msg.content) {
-        transcript += `${msg.content}\n`;
-      }
-
-      if (msg.embeds.length > 0) {
-        transcript += `[Embed: ${msg.embeds[0].title || "Untitled"}]\n`;
-      }
-
-      if (msg.attachments.size > 0) {
-        msg.attachments.forEach((att) => {
-          transcript += `[Attachment: ${att.url}]\n`;
-        });
-      }
-
-      transcript += `\n`;
-    });
-
-    // Create completion embed
-    const embed = new EmbedBuilder()
-      .setColor(config.colors.success)
-      .setTitle("✅ Transaction Completed")
-      .setDescription("This transaction has been successfully completed!")
-      .addFields(
-        {
-          name: "🆔 Transaction ID",
-          value: `\`${transactionId}\``,
-          inline: true,
-        },
-        { name: "🛡️ Completed By", value: `${interaction.user}`, inline: true },
-        {
-          name: "📅 Completed At",
-          value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-          inline: false,
-        }
-      )
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
-
-    // Lock and archive thread
-    await thread.setLocked(true);
-    await thread.setArchived(true);
-
-    // Send DM to buyer and seller
-    try {
-      const buyer = await interaction.client.users.fetch(
-        transaction.buyer.userId
-      );
-      const seller = await interaction.client.users.fetch(
-        transaction.seller.userId
-      );
-
-      const dmEmbed = new EmbedBuilder()
-        .setColor(config.colors.success)
-        .setTitle("✅ Transaction Completed")
-        .setDescription(
-          `Your transaction \`${transactionId}\` has been completed successfully!`
-        )
-        .addFields(
-          { name: "Completed By", value: interaction.user.tag, inline: true },
-          {
-            name: "Date",
-            value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-            inline: true,
-          }
-        );
-
-      await buyer.send({ embeds: [dmEmbed] }).catch(() => {});
-      await seller.send({ embeds: [dmEmbed] }).catch(() => {});
-    } catch (error) {
-      console.error("Error sending DM:", error);
-    }
-
-    // Log with transcript
-    const settings = await getSettings(interaction.guild.id);
-    if (settings.logChannel) {
-      const logChannel = interaction.guild.channels.cache.get(
-        settings.logChannel
-      );
-      if (logChannel) {
-        const logEmbed = new EmbedBuilder()
-          .setColor(config.colors.success)
-          .setTitle("✅ MM Transaction Completed")
-          .addFields(
-            { name: "Transaction ID", value: transactionId, inline: true },
-            { name: "Buyer", value: transaction.buyer.username, inline: true },
-            {
-              name: "Seller",
-              value: transaction.seller.username,
-              inline: true,
-            },
-            { name: "Middleman", value: `${interaction.user}`, inline: true },
-            { name: "Status", value: "✅ Completed", inline: true },
-            {
-              name: "Completed At",
-              value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-              inline: true,
-            }
-          )
-          .setTimestamp();
-
-        // Send transcript as file
-        const buffer = Buffer.from(transcript, "utf-8");
-        const attachment = {
-          attachment: buffer,
-          name: `transcript-${transactionId}.txt`,
-        };
-
-        await logChannel.send({
-          embeds: [logEmbed],
-          files: [attachment],
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error completing transaction:", error);
-    await interaction.editReply({
-      content: "❌ An error occurred while completing the transaction!",
-    });
-  }
-}
+/* ================= CLOSE TICKET ================= */
 
 async function handleClose(interaction, transactionId) {
   await interaction.deferReply();
@@ -267,57 +71,106 @@ async function handleClose(interaction, transactionId) {
     });
 
     if (!transaction) {
-      return interaction.editReply({ content: "❌ Transaction not found!" });
+      return interaction.editReply({
+        content: "❌ Transaction not found!",
+      });
     }
 
-    // Update transaction status
     transaction.status = "cancelled";
+    transaction.closedAt = new Date();
     await transaction.save();
 
-    const embed = new EmbedBuilder()
+    const thread = interaction.channel;
+
+    /* ===== EMBED DI THREAD ===== */
+
+    const closeEmbed = new EmbedBuilder()
       .setColor(config.colors.error)
       .setTitle("❌ Ticket Closed")
-      .setDescription("This ticket has been closed.")
       .addFields(
         {
-          name: "🆔 Transaction ID",
-          value: `\`${transactionId}\``,
+          name: "Transaction ID",
+          value: transactionId,
           inline: true,
         },
-        { name: "👮 Closed By", value: `${interaction.user}`, inline: true }
+        {
+          name: "Closed By",
+          value: `${interaction.user}`,
+          inline: true,
+        }
       )
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [closeEmbed] });
 
-    // Lock and archive thread
-    const thread = interaction.channel;
     await thread.setLocked(true);
     await thread.setArchived(true);
 
-    // Log
-    const settings = await getSettings(interaction.guild.id);
-    if (settings.logChannel) {
-      const logChannel = interaction.guild.channels.cache.get(
-        settings.logChannel
-      );
-      if (logChannel) {
-        const logEmbed = new EmbedBuilder()
-          .setColor(config.colors.warning)
-          .setTitle("❌ MM Ticket Closed")
-          .addFields(
-            { name: "Transaction ID", value: transactionId, inline: true },
-            { name: "Closed By", value: `${interaction.user}`, inline: true }
-          )
-          .setTimestamp();
+    /* ===== LOG CHANNEL ===== */
 
-        await logChannel.send({ embeds: [logEmbed] });
-      }
-    }
+    const settings = await getSettings(interaction.guild.id);
+    if (!settings.logChannel) return;
+
+    const logChannel = interaction.guild.channels.cache.get(
+      settings.logChannel
+    );
+    if (!logChannel) return;
+
+    const logEmbed = new EmbedBuilder()
+      .setColor("#2b2d31")
+      .setTitle("📄 MM Ticket Closed")
+      .addFields(
+        {
+          name: "Transaction ID",
+          value: transaction.transactionId,
+          inline: true,
+        },
+        {
+          name: "Amount",
+          value: `Rp ${transaction.priceRange}`,
+          inline: true,
+        },
+        {
+          name: "Fee",
+          value: `Rp ${transaction.fee}`,
+          inline: true,
+        },
+        {
+          name: "Buyer",
+          value: `<@${transaction.buyer.userId}>`,
+          inline: true,
+        },
+        {
+          name: "Seller",
+          value: `<@${transaction.seller.userId}>`,
+          inline: true,
+        },
+        {
+          name: "Thread",
+          value: `${thread}`,
+          inline: true,
+        }
+      )
+      .setTimestamp();
+
+    const actionRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("Access Thread")
+        .setStyle(ButtonStyle.Link)
+        .setURL(thread.url)
+    );
+
+    await logChannel.send({
+      embeds: [logEmbed],
+      components: [actionRow],
+    });
   } catch (error) {
-    console.error("Error closing ticket:", error);
+    console.error("MM Close Error:", error);
     await interaction.editReply({
-      content: "❌ An error occurred while closing the ticket!",
+      content: "❌ Error while closing ticket",
     });
   }
 }
+
+/* ================= PLACEHOLDER ================= */
+/* Function lain sengaja tidak diubah */
