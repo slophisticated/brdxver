@@ -248,17 +248,16 @@ export async function handleModalSubmit(interaction) {
       .addFields(
         {
           name: "📱 QRIS",
-          value: "```Scan kode QR di bawah ini```",
+          value: "Scan kode QR di bawah ini",
           inline: false,
         },
         {
-          name: "💼 E-Wallet / Rekening Bank",
-          value:
-            "• **GoPay:** `08158843876`\n• **OVO:** `08158843876`\n• **DANA:** `08158843876`\n• **Bank BCA:** `7611612552` a.n. Konrad\n• **Seabank:** `901007767813` a.n. Konrad",
+          name: "Untuk Transaksi Selain Qris",
+          value: "Boleh ditanyakan langsung ke middleman yang bertugas",
           inline: false,
         }
       )
-      .setImage("https://i.imgur.com/qris_placeholder.png") // Ganti dengan QRIS image URL lu
+      .setImage("https://i.imgur.com/6EIDOLf.png") // Ganti dengan QRIS image URL lu
       .setFooter({ text: "Pastikan transfer sesuai jumlah yang tertera" })
       .setTimestamp();
 
