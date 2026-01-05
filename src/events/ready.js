@@ -6,7 +6,7 @@ export default {
   execute(client) {
     console.log(`🚀 Bot is online as ${client.user.tag}`);
 
-    const guild = client.guilds.cache.get("ID_SERVER_KAMU");
+    const guild = client.guilds.cache.get("1422567690362683507");
     if (!guild) return;
 
     client.user.setPresence({
@@ -16,7 +16,7 @@ export default {
           type: ActivityType.Watching,
         },
       ],
-      status: "online",
+      status: "idle",
     });
 
     setInterval(() => {
