@@ -1,9 +1,6 @@
-import {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  PermissionFlagsBits,
-} from "discord.js";
+import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import config from "../../config/config.js";
+import getSettings from "../../utils/getsettings.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -171,8 +168,7 @@ export default {
     await interaction.editReply({ embeds: [resultEmbed] });
 
     // Send to log channel
-    const settings = await import("../../utils/getsettings.js");
-    const guildSettings = await settings.default(interaction.guild.id);
+    const guildSettings = await getSettings(interaction.guild.id);
 
     if (guildSettings.logChannel) {
       const logChannel = interaction.guild.channels.cache.get(
